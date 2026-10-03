@@ -453,7 +453,28 @@ function renderBox(){
          (pid ? '<div class="ex"><button data-ex="r" data-pid="'+pid+'"'+(e.r ? ' class="has"' : "")+'>得'+(e.r||0)+'</button>' +
                 '<button data-ex="sb" data-pid="'+pid+'"'+(e.sb ? ' class="has"' : "")+'>盗'+(e.sb||0)+'</button></div>' : "") + '</div>';
   }
+  /* 途中から出た選手（代打・代走）の得点・盗塁 */
+  const starters = {};
+  for(let s=0;s<9;s++) if(g.lineup[s].pid) starters[g.lineup[s].pid] = 1;
+  const subs = [];
+  g.pas.forEach(function(a){ if(!starters[a.pid] && subs.indexOf(a.pid) < 0) subs.push(a.pid); });
+  Object.keys(g.extra).forEach(function(pid){ if(!starters[pid] && subs.indexOf(pid) < 0 && P(pid)) subs.push(pid); });
+  subs.forEach(function(pid){
+    const e = g.extra[pid] || {};
+    h += '<div class="r"><div class="o" style="font-size:11px;color:var(--dim)">途</div><div class="nm">'+esc(short(pid))+'</div>' +
+         '<div class="chips" style="font-size:11.5px;color:var(--dim)">途中出場</div>' +
+         '<div class="ex"><button data-ex="r" data-pid="'+pid+'"'+(e.r ? ' class="has"' : "")+'>得'+(e.r||0)+'</button>' +
+         '<button data-ex="sb" data-pid="'+pid+'"'+(e.sb ? ' class="has"' : "")+'>盗'+(e.sb||0)+'</button></div></div>';
+  });
+  h += '<select id="addSub" style="margin-top:8px;font-size:14px"><option value="">＋ 代走で出た選手を足す</option>' +
+       DB.players.filter(function(p){ return !starters[p.id] && subs.indexOf(p.id) < 0; }).map(function(p){
+         return '<option value="'+p.id+'">'+esc((p.no ? p.no + " " : "") + p.name)+'</option>'; }).join("") + '</select>';
   $("box").innerHTML = h;
+  $("addSub").onchange = function(e){
+    if(!e.target.value) return;
+    g.extra[e.target.value] = g.extra[e.target.value] || {r:0, sb:0};
+    save(); renderBox();
+  };
 }
 $("eRec").onclick = function(){
   const g = G();
@@ -1026,6 +1047,7 @@ $("mkCode").onclick = function(){
   g.pas.forEach(function(a){ ids[a.pid] = 1; });
   g.pit.forEach(function(x){ if(x.pid) ids[x.pid] = 1; });
   g.def.forEach(function(x){ if(x.pid) ids[x.pid] = 1; });
+  Object.keys(g.extra || {}).forEach(function(pid){ ids[pid] = 1; });
   const players = Object.keys(ids).map(function(id){ const p = P(id); return p ? {id:p.id, no:p.no || "", name:p.name} : null; }).filter(Boolean);
   packCode("G", {game:g, players:players}).then(function(code){
     _code = code;
